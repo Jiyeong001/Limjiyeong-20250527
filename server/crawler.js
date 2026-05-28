@@ -5,19 +5,23 @@ const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
-const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const REVIEW_API = 'https://m.oliveyoung.co.kr/review/api/v2/reviews/cursor';
+
+// 로컬(Windows)은 설치된 Chrome, Railway는 nixpacks로 설치된 Chromium 사용
+const CHROME_PATH = process.env.PUPPETEER_EXECUTABLE_PATH ||
+  (process.platform === 'win32' ? 'C:/Program Files/Google/Chrome/Application/chrome.exe' : null);
 
 // 브라우저 싱글턴 — 매 요청마다 Chrome 재시작 방지
 let browserInstance = null;
 
 async function getBrowser() {
   if (browserInstance && browserInstance.isConnected()) return browserInstance;
-  browserInstance = await puppeteer.launch({
+  const launchOptions = {
     headless: 'new',
-    executablePath: CHROME_PATH,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  });
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+  };
+  if (CHROME_PATH) launchOptions.executablePath = CHROME_PATH;
+  browserInstance = await puppeteer.launch(launchOptions);
   return browserInstance;
 }
 
