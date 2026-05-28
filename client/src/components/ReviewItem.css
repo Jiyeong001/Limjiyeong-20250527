@@ -1,0 +1,117 @@
+/* ReviewList */
+.review-list { padding: 8px 0; }
+
+.no-reviews {
+  padding: 48px;
+  text-align: center;
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+/* ReviewItem */
+.review-item {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-200);
+  transition: background 0.1s;
+}
+
+.review-item:last-child { border-bottom: none; }
+.review-item:hover { background: var(--gray-50); }
+
+.review-item.experience {
+  background: #FFFBF5;
+  opacity: 0.85;
+}
+
+.review-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.review-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rank {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand);
+  background: var(--brand-light);
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+.stars { display: flex; gap: 1px; }
+
+.star { color: var(--gray-300); font-size: 13px; }
+.star.filled { color: #FFB300; }
+
+.experience-badge {
+  font-size: 11px;
+  background: #FFF8E1;
+  color: #E65100;
+  border: 1px solid #FFE082;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-weight: 600;
+}
+
+.trust-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-weight: 700;
+}
+
+.trust-badge.trust-high { background: #E8F5E9; color: #2E7D32; }
+.trust-badge.trust-mid { background: #FFF8E1; color: #E65100; }
+.trust-badge.trust-low { background: #FFEBEE; color: #C62828; }
+
+.review-date {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.review-content {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--gray-900);
+  margin-bottom: 10px;
+}
+
+.review-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.review-author {
+  font-size: 12px;
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+.review-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+.tag-repurchase { background: #E8F5E9; color: #2E7D32; }
+.tag-longterm { background: #E3F2FD; color: #1565C0; }
+.tag-top-reviewer { background: #F3E5F5; color: #6A1B9A; }
