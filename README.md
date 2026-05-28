@@ -2,7 +2,7 @@
 
 > 쇼핑몰 리뷰의 신뢰도를 진단하고, 바이럴을 걸러낸 신뢰도 높은 리뷰를 AI로 요약하는 MVP
 
-**배포 URL:** https://always-production.up.railway.app
+**배포 URL:** https://limjiyeong-20250527-production.up.railway.app/
 
 ---
 
