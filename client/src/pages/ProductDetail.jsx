@@ -6,13 +6,19 @@ import ReviewList from '../components/ReviewList';
 import MetaInfo from '../components/MetaInfo';
 import './ProductDetail.css';
 
-function ProductDetail({ product, onBack }) {
+function ProductDetail({ product, onBack, sessionId }) {
   const [imgError, setImgError] = useState(false);
   const [reviewData, setReviewData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('trust');
-  const [liveMeta, setLiveMeta] = useState(null); // { price, originalPrice, rating }
+  const [liveMeta, setLiveMeta] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   useEffect(() => {
     axios.post('/api/product-metas', { goodsNos: [product.goodsNo] })
@@ -25,7 +31,12 @@ function ProductDetail({ product, onBack }) {
     setError(null);
     try {
       const url = `https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=${product.goodsNo}`;
-      const res = await axios.post('/api/analyze', { url, productName: product.name });
+      const res = await axios.post('/api/analyze', {
+        url,
+        productName: product.name,
+        sessionId,
+        category: product.category,
+      });
       setReviewData(res.data);
       setActiveTab('trust');
     } catch (e) {
@@ -109,8 +120,8 @@ function ProductDetail({ product, onBack }) {
             </div>
 
             <div className="detail-actions">
-              <button className="btn-cart">장바구니 담기</button>
-              <button className="btn-buy">바로 구매하기</button>
+              <button className="btn-cart" onClick={() => showToast('장바구니에 담겼습니다 🛒')}>장바구니 담기</button>
+              <button className="btn-buy" onClick={() => showToast('올웨이즈 앱에서 구매할 수 있어요 📦')}>바로 구매하기</button>
             </div>
           </div>
         </div>
@@ -126,7 +137,7 @@ function ProductDetail({ product, onBack }) {
                 <span className="ai-badge">AI</span> 리뷰 신뢰도 진단
               </h2>
               <p className="review-analysis-sub">
-                체험단·바이럴을 제거한 진성 구매자 리뷰만 분석합니다
+                재구매·장기사용·우수리뷰어 신호를 기반으로 신뢰도를 분석합니다
               </p>
             </div>
           </div>
@@ -150,7 +161,7 @@ function ProductDetail({ product, onBack }) {
             <div className="review-results">
               <MetaInfo meta={reviewData.meta} />
 
-              <SummaryCard summary={reviewData.summary} />
+              <SummaryCard summary={reviewData.summary} personalization={reviewData.personalization} />
 
               <div className="review-list-section">
                 <div className="review-list-header">
@@ -168,7 +179,7 @@ function ProductDetail({ product, onBack }) {
                   </div>
                 </div>
                 {activeTab === 'trust' && (
-                  <p className="tab-desc">체험단·바이럴 리뷰를 걸러낸 신뢰도 높은 리뷰를 먼저 보여드려요.</p>
+                  <p className="tab-desc">신뢰도 신호가 강한 리뷰를 먼저 보여드려요.</p>
                 )}
                 <ReviewList reviews={activeReviews} showTrustScore={activeTab === 'trust'} />
               </div>
@@ -176,6 +187,8 @@ function ProductDetail({ product, onBack }) {
           )}
         </div>
       </div>
+
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }

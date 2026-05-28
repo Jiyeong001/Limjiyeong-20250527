@@ -14,7 +14,7 @@ const openai = new OpenAI({
  * - 무작위 리뷰가 아닌 신뢰도 스코어링 후 상위 N개만 인풋으로 사용
  * - 체험단, 바이럴 리뷰가 제거된 상태에서 요약
  */
-async function generateSummary(reviews, productName = '해당 상품') {
+async function generateSummary(reviews, productName = '해당 상품', dominantCategory = null, peerInsights = null) {
   if (!reviews || reviews.length === 0) {
     return {
       pros: '리뷰 데이터가 부족합니다.',
@@ -27,7 +27,15 @@ async function generateSummary(reviews, productName = '해당 상품') {
     .map((r, i) => `[리뷰${i + 1}] 별점:${r.rating}점 | ${r.content}`)
     .join('\n');
 
-  const prompt = `아래는 "${productName}"에 대한 실구매자 리뷰입니다. (체험단, 바이럴 리뷰는 이미 필터링된 상태입니다)
+  let personalizationHint = '';
+  if (peerInsights) {
+    const { avgAge, dominantOccupation, topConcerns } = peerInsights;
+    personalizationHint = `\n이 유저와 유사한 구매 패턴을 가진 유저군(평균 ${avgAge}세 ${dominantOccupation}, 주요 관심사: ${topConcerns.join(', ')})의 관점에서 특히 유용한 정보를 강조해주세요.`;
+  } else if (dominantCategory) {
+    personalizationHint = `\n이 유저는 최근 ${dominantCategory} 카테고리 상품을 주로 탐색했습니다. 해당 관점에서 특히 유용한 정보를 강조해주세요.`;
+  }
+
+  const prompt = `아래는 "${productName}"에 대한 실구매자 리뷰입니다. (체험단, 바이럴 리뷰는 이미 필터링된 상태입니다)${personalizationHint}
 
 ${reviewTexts}
 

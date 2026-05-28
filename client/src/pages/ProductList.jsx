@@ -83,9 +83,9 @@ function ProductList({ onProductSelect }) {
           <h1 className="hero-title">
             진짜 리뷰만<br /><em>골라드립니다</em>
           </h1>
-          <p className="hero-sub">체험단·바이럴을 걸러낸 신뢰도 리뷰 + AI 요약</p>
+          <p className="hero-sub">바이럴을 걸러낸 신뢰도 리뷰 + AI 요약</p>
           <div className="hero-pills">
-            <div className="pill"><span>🚫</span> 체험단 필터링</div>
+            <div className="pill"><span>✅</span> 신뢰도 스코어링</div>
             <div className="pill"><span>⭐</span> 신뢰도순 정렬</div>
             <div className="pill"><span>🤖</span> AI 진단 요약</div>
           </div>

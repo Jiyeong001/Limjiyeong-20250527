@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import './SummaryCard.css';
 
-function SummaryCard({ summary }) {
+function SummaryCard({ summary, personalization }) {
   const [expanded, setExpanded] = useState(true);
 
   if (!summary) return null;
+
+  const reviewCountText = summary.reviewCount ? `신뢰도 상위 리뷰 ${summary.reviewCount}개 기반` : '신뢰도 상위 리뷰 기반';
+  const ratingText = summary.avgRating ? ` · 평균 ${summary.avgRating}점` : '';
 
   return (
     <div className="summary-card">
@@ -13,11 +16,17 @@ function SummaryCard({ summary }) {
           <div className="summary-icon-wrap">🤖</div>
           <div>
             <h2>AI 진단 요약</h2>
-            <p>신뢰도 상위 리뷰 {summary.reviewCount}개 기반 · 평균 {summary.avgRating}점</p>
+            <p>{reviewCountText}{ratingText}</p>
           </div>
         </div>
         <span className="toggle-icon">{expanded ? '▲' : '▼'}</span>
       </div>
+
+      {personalization?.peerInsights && (
+        <div className="summary-personalization">
+          ✨ <strong>{personalization.peerInsights.topConcerns.join(' · ')}</strong> 관심 유저들과 비슷한 탐색 패턴이에요. 관련 리뷰를 우선 분석했어요.
+        </div>
+      )}
 
       {expanded && (
         <div className="summary-body">
@@ -46,7 +55,7 @@ function SummaryCard({ summary }) {
           </div>
 
           <p className="summary-disclaimer">
-            * 체험단·바이럴 리뷰를 제거한 신뢰도 높은 리뷰만을 기반으로 생성된 요약입니다.
+            * 재구매·장기사용 등 신뢰 신호가 강한 리뷰를 우선으로 생성된 요약입니다.
           </p>
         </div>
       )}

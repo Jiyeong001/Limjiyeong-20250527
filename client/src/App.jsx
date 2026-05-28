@@ -25,6 +25,8 @@ function Header({ onLogoClick }) {
 function App() {
   const [page, setPage] = useState('list');
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [sessionId] = useState(() => crypto.randomUUID());
+
   const handleProductSelect = (product) => {
     setSelectedProduct(product);
     setPage('detail');
@@ -44,7 +46,7 @@ function App() {
         <ProductList onProductSelect={handleProductSelect} />
       )}
       {page === 'detail' && selectedProduct && (
-        <ProductDetail product={selectedProduct} onBack={handleBack} />
+        <ProductDetail product={selectedProduct} onBack={handleBack} sessionId={sessionId} />
       )}
     </div>
   );

@@ -55,6 +55,14 @@
   transition: transform 0.2s;
 }
 
+.summary-personalization {
+  padding: 10px 24px;
+  font-size: 13px;
+  color: var(--gray-700);
+  background: #F5F0FF;
+  border-top: 1px solid #E0D5FF;
+}
+
 .summary-body {
   border-top: 1.5px solid var(--gray-200);
   padding: 20px 24px;

@@ -6,6 +6,7 @@ const fs = require('fs').promises;
 const { crawlReviews, fetchProductMeta } = require('./crawler');
 const { calculateTrustScores, sortByTrust, getTopTrustReviews } = require('./trustScore');
 const { generateSummary } = require('./summarizer');
+const { assignMockUser, findPeers, derivePeerInsights } = require('./similarity');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -39,7 +40,11 @@ app.use(express.json());
 const sessions = new Map(); // sessionId → { categories: string[], productCount: number }
 
 function getSession(sessionId) {
-  if (!sessions.has(sessionId)) sessions.set(sessionId, { categories: [], productCount: 0 });
+  if (!sessions.has(sessionId)) {
+    const { MOCK_USERS } = require('./mockUsers');
+    const assignedUser = MOCK_USERS[Math.floor(Math.random() * MOCK_USERS.length)];
+    sessions.set(sessionId, { assignedUser, clickHistory: [], productCount: 0 });
+  }
   return sessions.get(sessionId);
 }
 
@@ -71,7 +76,7 @@ app.post('/api/product-metas', async (req, res) => {
 });
 
 app.post('/api/analyze', async (req, res) => {
-  const { url, productName } = req.body;
+  const { url, productName, sessionId, category } = req.body;
 
   if (!url) return res.status(400).json({ error: '상품 URL을 입력해주세요.' });
   if (!url.includes('oliveyoung.co.kr')) {
@@ -82,45 +87,70 @@ app.post('/api/analyze', async (req, res) => {
     const goodsNoMatch = url.match(/goodsNo=([A-Z0-9]+)/i);
     const goodsNo = goodsNoMatch?.[1];
 
-    if (goodsNo) {
-      const cached = await getCached(goodsNo);
-      if (cached) {
-        console.log(`[Server] 캐시 반환: ${goodsNo}`);
-        return res.json({ ...cached, meta: { ...cached.meta, fromCache: true } });
+    // 세션 업데이트: 클릭 히스토리 누적, peer group은 고정된 페르소나 기준
+    let personalization = null;
+    if (sessionId && category) {
+      const session = getSession(sessionId);
+
+      // 두 번째 상품부터 개인화 표시
+      if (session.productCount >= 1 && session.assignedUser) {
+        const peers = findPeers(session.assignedUser);
+        const peerInsights = derivePeerInsights(peers);
+        personalization = { peerInsights };
       }
+
+      // 클릭 히스토리 따로 누적 (페르소나 변경 없음)
+      session.clickHistory.push({ category, goodsNo: url.match(/goodsNo=([A-Z0-9]+)/i)?.[1] });
+      session.productCount += 1;
     }
 
-    console.log(`[Server] 분석 시작: ${url}`);
+    // 리뷰 캐시 확인 (요약은 캐시하지 않음 — 유저마다 다르게 생성)
+    let reviewCache = null;
+    if (goodsNo) reviewCache = await getCached(goodsNo);
 
-    const { reviews: rawReviews, source, productName: crawledName } = await crawlReviews(url);
-    const scoredReviews = calculateTrustScores(rawReviews);
+    let rawReviews, scoredReviews, resolvedName, topReviews, meta;
 
-    const resolvedName = productName || crawledName || '상품';
-    const topReviews = getTopTrustReviews(scoredReviews, 30);
-    const summary = await generateSummary(topReviews, resolvedName);
-
-    const avgRating = rawReviews.reduce((s, r) => s + r.rating, 0) / rawReviews.length;
-
-    const result = {
-      meta: {
+    if (reviewCache) {
+      console.log(`[Server] 리뷰 캐시 반환: ${goodsNo}`);
+      rawReviews = reviewCache.rawReviews;
+      scoredReviews = reviewCache.scoredReviews;
+      resolvedName = reviewCache.meta.productName;
+      topReviews = getTopTrustReviews(scoredReviews, 30);
+      meta = { ...reviewCache.meta, fromCache: true };
+    } else {
+      console.log(`[Server] 분석 시작: ${url}`);
+      const crawled = await crawlReviews(url);
+      rawReviews = crawled.reviews;
+      const source = crawled.source;
+      const crawledName = crawled.productName;
+      scoredReviews = calculateTrustScores(rawReviews);
+      resolvedName = productName || crawledName || '상품';
+      topReviews = getTopTrustReviews(scoredReviews, 30);
+      const avgRating = rawReviews.reduce((s, r) => s + r.rating, 0) / rawReviews.length;
+      meta = {
         totalReviews: rawReviews.length,
         experienceReviews: rawReviews.filter(r => r.isExperienceReview).length,
         avgRating: Math.round(avgRating * 10) / 10,
         dataSource: source,
         productName: resolvedName,
         analyzedAt: new Date().toISOString(),
-      },
+      };
+      if (goodsNo) await setCache(goodsNo, { rawReviews, scoredReviews, meta });
+    }
+
+    // 요약은 매번 fresh 생성 (유저 개인화 반영)
+    const summary = await generateSummary(topReviews, resolvedName, null, personalization?.peerInsights);
+
+    res.json({
+      meta,
       reviews: {
         recommended: rawReviews,
         latest: [...rawReviews].sort((a, b) => new Date(b.date) - new Date(a.date)),
         trust: sortByTrust(scoredReviews),
       },
       summary,
-    };
-
-    if (goodsNo) await setCache(goodsNo, result);
-
-    res.json(result);
+      personalization,
+    });
   } catch (error) {
     console.error('[Server] 오류:', error.message);
     res.status(500).json({ error: error.message || '분석 중 오류가 발생했습니다.' });
