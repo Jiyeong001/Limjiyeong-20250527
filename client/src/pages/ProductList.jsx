@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { PRODUCTS, CATEGORIES, getImageUrl } from '../data/products';
 import './ProductList.css';
 
-function ProductCard({ product, onClick }) {
+function ProductCard({ product, onClick, liveMeta }) {
   const [imgError, setImgError] = useState(false);
-  const discount = Math.round((1 - product.price / product.originalPrice) * 100);
+  const price = liveMeta?.price || product.price;
+  const originalPrice = liveMeta?.originalPrice || product.originalPrice;
+  const rating = liveMeta?.rating || product.rating;
+  const reviewCount = liveMeta?.reviewCount ?? null;
+  const discount = Math.round((1 - price / originalPrice) * 100);
 
   return (
     <div className="product-card" onClick={() => onClick(product)}>
@@ -33,14 +38,16 @@ function ProductCard({ product, onClick }) {
         <p className="product-brand">{product.brand}</p>
         <p className="product-name">{product.name}</p>
         <div className="product-price-row">
-          <span className="product-discount">{discount}%</span>
-          <span className="product-price">{product.price.toLocaleString()}원</span>
+          {discount > 0 && <span className="product-discount">{discount}%</span>}
+          <span className="product-price">{price.toLocaleString()}원</span>
         </div>
-        <p className="product-original">{product.originalPrice.toLocaleString()}원</p>
+        <p className="product-original">{originalPrice.toLocaleString()}원</p>
         <div className="product-rating-row">
-          <span className="stars-small">{'★'.repeat(Math.round(product.rating))}{'☆'.repeat(5 - Math.round(product.rating))}</span>
-          <span className="rating-score">{product.rating}</span>
-          <span className="review-count">({product.reviewCount.toLocaleString()})</span>
+          <span className="stars-small">{'★'.repeat(Math.round(rating))}{'☆'.repeat(5 - Math.round(rating))}</span>
+          <span className="rating-score">{rating}</span>
+          {reviewCount != null && (
+            <span className="review-count">({reviewCount.toLocaleString()})</span>
+          )}
         </div>
       </div>
     </div>
@@ -49,6 +56,18 @@ function ProductCard({ product, onClick }) {
 
 function ProductList({ onProductSelect }) {
   const [activeCategory, setActiveCategory] = useState('전체');
+  const [liveMeta, setLiveMeta] = useState({}); // goodsNo → { price, originalPrice, rating, reviewCount }
+
+  useEffect(() => {
+    const goodsNos = PRODUCTS.map(p => p.goodsNo);
+    axios.post('/api/product-metas', { goodsNos })
+      .then(res => {
+        const map = {};
+        res.data.forEach(m => { map[m.goodsNo] = m; });
+        setLiveMeta(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const filtered = activeCategory === '전체'
     ? PRODUCTS
@@ -96,6 +115,7 @@ function ProductList({ onProductSelect }) {
             key={product.goodsNo + product.name}
             product={product}
             onClick={onProductSelect}
+            liveMeta={liveMeta[product.goodsNo] ?? null}
           />
         ))}
       </div>

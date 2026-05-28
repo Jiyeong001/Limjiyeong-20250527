@@ -12,7 +12,13 @@ function ProductDetail({ product, onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('trust');
-  const discount = Math.round((1 - product.price / product.originalPrice) * 100);
+  const [liveMeta, setLiveMeta] = useState(null); // { price, originalPrice, rating }
+
+  useEffect(() => {
+    axios.post('/api/product-metas', { goodsNos: [product.goodsNo] })
+      .then(res => { if (res.data?.[0]) setLiveMeta(res.data[0]); })
+      .catch(() => {});
+  }, [product.goodsNo]);
 
   const handleAnalyze = async () => {
     setLoading(true);
@@ -32,6 +38,11 @@ function ProductDetail({ product, onBack }) {
   useEffect(() => {
     handleAnalyze();
   }, [product.goodsNo]);
+
+  const price = liveMeta?.price;
+  const originalPrice = liveMeta?.originalPrice;
+  const rating = reviewData?.meta?.avgRating ?? liveMeta?.rating;
+  const discount = price && originalPrice ? Math.round((1 - price / originalPrice) * 100) : null;
 
   const activeReviews = reviewData?.reviews?.[activeTab] || [];
 
@@ -67,21 +78,27 @@ function ProductDetail({ product, onBack }) {
           {/* 정보 */}
           <div className="detail-info">
             <p className="detail-brand">{product.brand}</p>
-            <h1 className="detail-name">{product.name}</h1>
+            <h1 className="detail-name">{reviewData?.meta?.productName || product.name}</h1>
 
-            <div className="detail-rating-row">
-              <span className="stars-detail">{'★'.repeat(Math.round(product.rating))}{'☆'.repeat(5 - Math.round(product.rating))}</span>
-              <span className="detail-rating">{product.rating}</span>
-              <span className="detail-review-count">리뷰 {product.reviewCount.toLocaleString()}개</span>
-            </div>
-
-            <div className="detail-price-box">
-              <div className="detail-price-row">
-                <span className="detail-discount">{discount}%</span>
-                <span className="detail-price">{product.price.toLocaleString()}원</span>
+            {rating != null && (
+              <div className="detail-rating-row">
+                <span className="stars-detail">{'★'.repeat(Math.round(rating))}{'☆'.repeat(5 - Math.round(rating))}</span>
+                <span className="detail-rating">{rating}</span>
+                {reviewData?.meta?.totalReviews && (
+                  <span className="detail-review-count">리뷰 {reviewData.meta.totalReviews.toLocaleString()}개 분석</span>
+                )}
               </div>
-              <p className="detail-original">{product.originalPrice.toLocaleString()}원</p>
-            </div>
+            )}
+
+            {price && (
+              <div className="detail-price-box">
+                <div className="detail-price-row">
+                  {discount > 0 && <span className="detail-discount">{discount}%</span>}
+                  <span className="detail-price">{price.toLocaleString()}원</span>
+                </div>
+                {originalPrice && <p className="detail-original">{originalPrice.toLocaleString()}원</p>}
+              </div>
+            )}
 
             <p className="detail-description">{product.description}</p>
 
@@ -119,7 +136,7 @@ function ProductDetail({ product, onBack }) {
             <div className="review-loading">
               <div className="loading-spinner" />
               <p className="loading-text">리뷰 분석 중...</p>
-              <p className="loading-sub">올리브영 리뷰 수집 및 AI 요약 생성 중 (30초 내외)</p>
+              <p className="loading-sub">리뷰 수집 및 AI 요약 생성 중 (30초 내외)</p>
             </div>
           )}
 

@@ -25,7 +25,6 @@ function Header({ onLogoClick }) {
 function App() {
   const [page, setPage] = useState('list');
   const [selectedProduct, setSelectedProduct] = useState(null);
-
   const handleProductSelect = (product) => {
     setSelectedProduct(product);
     setPage('detail');

@@ -37,13 +37,13 @@ function extractGoodsNo(url) {
 
 /**
  * Puppeteer로 페이지를 로드해 세션 확보 후,
- * 브라우저 내부 fetch로 리뷰 3페이지(30개) 수집
+ * 브라우저 내부 fetch로 리뷰 최대 150개 수집
  */
 async function fetchReviewsViaOliveyoung(productUrl, goodsNo) {
   const browser = await getBrowser();
-  const page = await browser.newPage();
-
+  let page;
   try {
+    page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'ko-KR,ko;q=0.9' });
 
@@ -53,32 +53,53 @@ async function fetchReviewsViaOliveyoung(productUrl, goodsNo) {
     const pageTitle = await page.title();
     const productName = pageTitle.replace(' | 올리브영', '').trim();
 
-    // 5페이지를 병렬로 동시 fetch
+    // 커서 기반 순차 페이지네이션 — 최대 150개 또는 더 이상 없을 때까지
     const reviews = await page.evaluate(async (goodsNo, reviewApi) => {
-      const PAGE_COUNT = 5;
-      const requests = Array.from({ length: PAGE_COUNT }, (_, p) =>
-        fetch(reviewApi, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            goodsNumber: goodsNo,
-            size: 20,
-            sortType: 'USEFUL_SCORE_DESC',
-            reviewType: 'ALL',
-            page: p,
-          }),
-        })
-          .then(r => r.json())
-          .then(data => data?.data?.goodsReviewList || [])
-          .catch(() => [])
-      );
+      const MAX = 150;
+      const all = [];
+      let cursorId = null;
+      let cursorScore = null;
 
-      const results = await Promise.all(requests);
-      const flat = results.flat();
+      while (all.length < MAX) {
+        const body = {
+          goodsNumber: goodsNo,
+          size: 20,
+          sortType: 'USEFUL_SCORE_DESC',
+          reviewType: 'ALL',
+        };
+        if (cursorId != null) {
+          body.cursorId = cursorId;
+          body.cursorScore = cursorScore;
+        }
+
+        let data;
+        try {
+          const res = await fetch(reviewApi, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          data = await res.json();
+        } catch { break; }
+
+        const list = data?.data?.goodsReviewList || [];
+        if (list.length === 0) break;
+
+        all.push(...list);
+
+        const hasNext = data?.data?.hasNext;
+        if (!hasNext) break;
+
+        const nextId = data?.data?.nextCursorId;
+        const nextScore = data?.data?.nextCursorScore;
+        if (nextId == null || nextId === cursorId) break;
+        cursorId = nextId;
+        cursorScore = nextScore;
+      }
 
       // 중복 제거
       const seen = new Set();
-      return flat.filter(r => {
+      return all.filter(r => {
         const id = r.reviewNo || r.reviewId || (r.content + r.createdDateTime);
         if (seen.has(id)) return false;
         seen.add(id);
@@ -106,7 +127,66 @@ async function fetchReviewsViaOliveyoung(productUrl, goodsNo) {
 
     return { reviews: normalized, productName };
   } finally {
-    await page.close();
+    if (page) await page.close();
+  }
+}
+
+/**
+ * 상품 페이지에서 가격·별점·리뷰건수만 빠르게 스크래핑
+ */
+async function fetchProductMeta(goodsNo) {
+  const url = `https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=${goodsNo}`;
+  const browser = await getBrowser();
+  let page;
+  try {
+    page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'ko-KR,ko;q=0.9' });
+
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 40000 });
+
+    // 가격 + 상품명 DOM에서 추출
+    const priceData = await page.evaluate(() => {
+      const num = el => el ? parseInt(el.textContent.replace(/[^0-9]/g, ''), 10) || null : null;
+      const productName = document.title.replace(' | 올리브영', '').trim();
+      return {
+        price: num(document.querySelector('[class*="price__"]')),
+        originalPrice: num(document.querySelector('[class*="price-before"]')),
+        productName,
+      };
+    });
+
+    // 리뷰 API에서 별점(평균)·건수 추출
+    const reviewData = await page.evaluate(async (goodsNo, reviewApi) => {
+      try {
+        const res = await fetch(reviewApi, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goodsNumber: goodsNo, size: 20, sortType: 'USEFUL_SCORE_DESC', reviewType: 'ALL' }),
+        });
+        const data = await res.json();
+        const list = data?.data?.goodsReviewList || [];
+        const hasNext = data?.data?.hasNext ?? false;
+
+        const avgRating = list.length > 0
+          ? Math.round(list.reduce((s, r) => s + (r.reviewScore || 0), 0) / list.length * 10) / 10
+          : null;
+
+        // hasNext가 false면 이 페이지가 전부, true면 최소 20+개
+        const count = hasNext ? null : list.length;
+
+        return { rating: avgRating, reviewCount: count };
+      } catch { return {}; }
+    }, goodsNo, REVIEW_API);
+
+    const meta = { ...priceData, ...reviewData };
+
+    return { goodsNo, ...meta };
+  } catch (e) {
+    if (!browserInstance?.isConnected()) browserInstance = null;
+    return { goodsNo };
+  } finally {
+    if (page) await page.close().catch(() => {});
   }
 }
 
@@ -123,4 +203,4 @@ async function crawlReviews(productUrl) {
   return { reviews: result.reviews, source: 'oliveyoung', productName: result.productName };
 }
 
-module.exports = { crawlReviews, extractGoodsNo };
+module.exports = { crawlReviews, fetchProductMeta };
